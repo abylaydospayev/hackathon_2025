@@ -1,45 +1,77 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, redirect
 import requests
+import subprocess
+import os
 
 app = Flask(__name__)
 
-proxy_list = [
-    "http://192.168.1.1:8080",
-    "http://103.25.47.13:3128",
-    "http://45.67.89.12:8080"
-]
+# === Hardcoded VPN Config Files ===
+vpn_configs = {
+    "Japan 🇯🇵": "vpn_configs/vpngate_2i6.opengw.net_udp_1194.ovpn",
+    # Add more here if needed
+}
 
-current_proxy = None
+current_vpn = None              # Label of current VPN
+vpn_process = None              # The subprocess handle for OpenVPN
 
-def get_ip_info(proxy=None):
-    proxies = {"http": proxy, "https": proxy} if proxy else None
+# === Get Public IP Info ===
+def get_current_ip():
     try:
-        response = requests.get("http://ipinfo.io/json", proxies=proxies, timeout=5)
+        response = requests.get("https://ipinfo.io/json", timeout=5)
         if response.status_code == 200:
             return response.json()
-        else:
-            return {"ip": "Unavailable", "city": "Error", "country": "Error"}
+        return {"ip": "Unavailable", "city": "Error", "country": "Error"}
     except Exception as e:
-        return {
-            "ip": "Unknown",
-            "city": "Unknown",
-            "country": "Unknown",
-            "error": str(e)
-        }
+        return {"ip": "Unknown", "city": "Unknown", "country": "Unknown", "error": str(e)}
 
-
-@app.route('/')
+# === Home Page ===
+@app.route("/")
 def home():
-    ip_info = get_ip_info(current_proxy)
-    return render_template("index.html", ip_info=ip_info, proxies=proxy_list)
+    ip_info = get_current_ip()
+    return render_template("vpn.html", ip_info=ip_info, vpn_configs=vpn_configs, current_vpn=current_vpn)
 
-@app.route('/switch', methods=['POST'])
-def switch_proxy():
-    global current_proxy
-    selected_proxy = request.form.get("proxy")
-    current_proxy = selected_proxy
-    ip_info = get_ip_info(current_proxy)
-    return render_template("index.html", ip_info=ip_info, proxies=proxy_list)
+# === Connect to VPN ===
+@app.route("/connect", methods=["POST"])
+def connect():
+    global current_vpn, vpn_process
+    selected = request.form.get("vpn_config")
+    config_path = vpn_configs.get(selected)
 
+    if config_path and os.path.exists(config_path):
+        # Stop existing VPN if running
+        if vpn_process:
+            vpn_process.terminate()
+            vpn_process.wait()
+
+        # ✅ Full path to OpenVPN
+        openvpn_path = r"C:\Program Files\OpenVPN\bin\openvpn.exe"
+
+        # ✅ Save OpenVPN logs to vpn_log.txt for debugging
+        log_file = open("vpn_log.txt", "w")
+
+        vpn_process = subprocess.Popen(
+            [openvpn_path, "--config", config_path],
+            stdout=log_file,
+            stderr=subprocess.STDOUT
+        )
+
+        current_vpn = selected
+
+    return redirect("/")
+
+
+
+# === Disconnect VPN ===
+@app.route("/disconnect", methods=["POST"])
+def disconnect():
+    global current_vpn, vpn_process
+    if vpn_process:
+        vpn_process.terminate()
+        vpn_process.wait()
+        vpn_process = None
+    current_vpn = None
+    return redirect("/")
+
+# === Run App ===
 if __name__ == "__main__":
     app.run(debug=True)

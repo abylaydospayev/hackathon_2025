@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<<<<<<< HEAD
     <meta charset="UTF-8">
     <title>Shadow Proxy</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -79,5 +80,35 @@
             .openPopup();
     });
 </script>
+=======
+    <title>🌍 VPN Geo-Shifter</title>
+</head>
+<body>
+    <h1>🛰️ VPN Geo-Shifter</h1>
+
+    <h3>🔎 Your IP Info:</h3>
+    <p><strong>IP:</strong> {{ ip_info.ip }}</p>
+    <p><strong>City:</strong> {{ ip_info.city }}</p>
+    <p><strong>Country:</strong> {{ ip_info.country }}</p>
+    {% if ip_info.error %}
+        <p style="color:red;"><strong>Error:</strong> {{ ip_info.error }}</p>
+    {% endif %}
+
+    <hr>
+
+    <form method="post" action="/connect">
+        <label>Select VPN Server:</label>
+        <select name="vpn_config">
+            {% for name, path in vpn_configs.items() %}
+            <option value="{{ name }}" {% if name == current_vpn %}selected{% endif %}>{{ name }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit">Connect</button>
+    </form>
+
+    <form method="post" action="/disconnect">
+        <button type="submit" style="margin-top: 10px;">Disconnect VPN</button>
+    </form>
+>>>>>>> testing_branch
 </body>
 </html>
