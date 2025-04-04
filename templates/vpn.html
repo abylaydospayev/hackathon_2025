@@ -43,8 +43,10 @@
                     <label class="form-label">🌐 Select VPN Server:</label>
                     <div class="input-group">
                         <select class="form-select" name="vpn_config">
-                            {% for name, path in vpn_configs.items() %}
-                                <option value="{{ name }}" {% if name == current_vpn %}selected{% endif %}>{{ name }}</option>
+                            {% for name, config in vpn_configs.items() %}
+                                <option value="{{ name }}" data-country-code="{{ config.country_code }}" {% if name == current_vpn %}selected{% endif %}>
+                                    {{ name }}
+                                </option>
                             {% endfor %}
                         </select>
                         <button class="btn btn-primary" type="submit">Connect</button>
@@ -65,6 +67,7 @@
 <!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
 <script>
+    // Map initialization
     document.addEventListener("DOMContentLoaded", function () {
         const loc = "{{ ip_info.loc|default('0,0') }}";
         const coords = loc.split(",");
@@ -72,7 +75,6 @@
         const lon = parseFloat(coords[1]);
 
         const map = L.map('map').setView([lat, lon], 4);
-
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
@@ -81,6 +83,47 @@
             .addTo(map)
             .bindPopup(`<b>Current VPN</b><br>{{ ip_info.ip }}<br>{{ ip_info.city }}, {{ ip_info.country }}`)
             .openPopup();
+    });
+
+    // AJAX Connection Handler
+    document.querySelector('form[action="/connect"]').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const form = e.target;
+        const formData = new FormData(form);
+        const selectedOption = form.querySelector('option:checked');
+        const expectedCountry = selectedOption.dataset.countryCode;
+        const connectButton = form.querySelector('button[type="submit"]');
+
+        // Disable button during connection
+        connectButton.disabled = true;
+        connectButton.innerHTML = 'Connecting...';
+
+        fetch('/connect', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (response.ok) {
+                // Start polling for IP change
+                const pollInterval = setInterval(() => {
+                    fetch('/get_ip')
+                        .then(res => res.json())
+                        .then(ipInfo => {
+                            if (ipInfo.country === expectedCountry) {
+                                clearInterval(pollInterval);
+                                window.location.reload();
+                            }
+                        });
+                }, 3000); // Check every 3 seconds
+            }
+        })
+        .catch(error => {
+            alert('Error: ' + error.message);
+        })
+        .finally(() => {
+            connectButton.disabled = false;
+            connectButton.innerHTML = 'Connect';
+        });
     });
 </script>
 </body>

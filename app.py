@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect
+from flask import Flask, render_template, request, redirect, jsonify
 import requests
 import subprocess
 import os
@@ -7,7 +7,10 @@ app = Flask(__name__)
 
 # === Hardcoded VPN Config Files ===
 vpn_configs = {
-    "Japan 🇯🇵": "vpn_configs/vpngate_2i6.opengw.net_udp_1194.ovpn",
+    "Japan 🇯🇵": {
+        "path": "vpn_configs/vpngate_2i6.opengw.net_udp_1194.ovpn",
+        "country_code": "JP"
+    },
     # Add more here if needed
 }
 
@@ -35,9 +38,9 @@ def home():
 def connect():
     global current_vpn, vpn_process
     selected = request.form.get("vpn_config")
-    config_path = vpn_configs.get(selected)
+    config_entry = vpn_configs.get(selected)
 
-    if config_path and os.path.exists(config_path):
+    if config_entry and os.path.exists(config_entry["path"]):
         # Stop existing VPN if running
         if vpn_process:
             vpn_process.terminate()
@@ -45,12 +48,10 @@ def connect():
 
         # ✅ Full path to OpenVPN
         openvpn_path = r"C:\Program Files\OpenVPN\bin\openvpn.exe"
-
-        # ✅ Save OpenVPN logs to vpn_log.txt for debugging
         log_file = open("vpn_log.txt", "w")
 
         vpn_process = subprocess.Popen(
-            [openvpn_path, "--config", config_path],
+            [openvpn_path, "--config", config_entry["path"]],
             stdout=log_file,
             stderr=subprocess.STDOUT
         )
@@ -58,8 +59,6 @@ def connect():
         current_vpn = selected
 
     return redirect("/")
-
-
 
 # === Disconnect VPN ===
 @app.route("/disconnect", methods=["POST"])
@@ -71,6 +70,12 @@ def disconnect():
         vpn_process = None
     current_vpn = None
     return redirect("/")
+
+# === IP Check Endpoint ===
+@app.route("/get_ip")
+def get_ip():
+    ip_info = get_current_ip()
+    return jsonify(ip_info)
 
 # === Run App ===
 if __name__ == "__main__":
