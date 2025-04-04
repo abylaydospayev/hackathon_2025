@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Shadow Proxy</title>
+</head>
+<body>
+    <h1>Your IP Info</h1>
+    <p><strong>IP:</strong> {{ ip_info.ip }}</p>
+    <p><strong>City:</strong> {{ ip_info.city }}</p>
+    <p><strong>Country:</strong> {{ ip_info.country }}</p>
+
+    <h2>Switch Proxy</h2>
+    <form method="post" action="/switch">
+        <select name="proxy">
+            {% for proxy in proxies %}
+                <option value="{{ proxy }}">{{ proxy }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit">Switch</button>
+    </form>
+    
+</body>
+</html>
