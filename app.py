@@ -19,7 +19,7 @@ ip_cache = {
 
 # === Get Public IP Info ===
 def get_current_ip():
-    # 🧠 Return cached IP info if still fresh
+    # Return cached IP info if still fresh
     now = time.time()
     if ip_cache["data"] and (now - ip_cache["timestamp"]) < ip_cache["ttl"]:
         return ip_cache["data"]
@@ -57,7 +57,7 @@ def get_current_ip():
         except:
             continue
 
-    # 🚫 Fallback if all services fail
+    # Fallback if all services fail
     return {
         "ip": "",
         "city": "Unknown",
@@ -88,7 +88,7 @@ def load_vpn_configs(folder="vpn_configs/connected"):
 
     return configs
 
-# ✅ Load configs before routes
+# Load configs before routes
 vpn_configs = load_vpn_configs()
 
 # === Home Page ===
