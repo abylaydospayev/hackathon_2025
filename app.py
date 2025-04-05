@@ -3,33 +3,68 @@ import requests
 import subprocess
 import os
 import glob
+import random
+import time 
 
 app = Flask(__name__)
 
 current_vpn = None              # Label of current VPN
 vpn_process = None              # The subprocess handle for OpenVPN
 
+ip_cache = {
+    "data": None,
+    "timestamp": 0,
+    "ttl": 60  
+}
+
 # === Get Public IP Info ===
 def get_current_ip():
+    # 🧠 Return cached IP info if still fresh
+    now = time.time()
+    if ip_cache["data"] and (now - ip_cache["timestamp"]) < ip_cache["ttl"]:
+        return ip_cache["data"]
+
     services = [
         "https://ipinfo.io/json",
         "https://api.myip.com",
         "https://ifconfig.co/json"
     ]
+
     for url in services:
         try:
             res = requests.get(url, timeout=5)
             if res.ok:
                 data = res.json()
-                return {
-                    "ip": data.get("ip") or data.get("address"),
-                    "city": data.get("city", "Unknown"),
-                    "country": data.get("country", "Unknown"),
-                    "loc": data.get("loc", "0,0")
+
+                ip = data.get("ip") or data.get("address", "")
+                city = data.get("city", "") or data.get("region", "Unknown")
+                country = data.get("country", "") or data.get("country_name", "Unknown")
+                loc = data.get("loc", "")
+                if not loc and "latitude" in data and "longitude" in data:
+                    loc = f"{data['latitude']},{data['longitude']}"
+
+                result = {
+                    "ip": ip,
+                    "city": city or "Unknown",
+                    "country": country or "Unknown",
+                    "loc": loc or "0,0"
                 }
+
+                # 💾 Update cache
+                ip_cache["data"] = result
+                ip_cache["timestamp"] = now
+                return result
         except:
             continue
-    return {"ip": "", "city": "", "country": "", "loc": "0,0", "error": "All IP services failed"}
+
+    # 🚫 Fallback if all services fail
+    return {
+        "ip": "",
+        "city": "Unknown",
+        "country": "Unknown",
+        "loc": "0,0",
+        "error": "All IP services failed"
+    }
 
 
 
@@ -85,7 +120,6 @@ def connect():
             universal_newlines=True
         )
 
-
         current_vpn = selected
 
     return redirect("/")
@@ -100,6 +134,31 @@ def disconnect():
         vpn_process = None
     current_vpn = None
     return redirect("/")
+
+# === Ghost Me (Random VPN) ===
+@app.route("/ghost", methods=["POST"])
+def ghost_me():
+    global current_vpn, vpn_process
+    if vpn_process:
+        vpn_process.terminate()
+        vpn_process.wait()
+
+    random_label = random.choice(list(vpn_configs.keys()))
+    config_entry = vpn_configs[random_label]
+
+    openvpn_path = r"C:\\Program Files\\OpenVPN\\bin\\openvpn.exe"
+    log_file = open("vpn_log.txt", "w", buffering=1)
+
+    vpn_process = subprocess.Popen(
+        [openvpn_path, "--config", config_entry["path"]],
+        stdout=log_file,
+        stderr=subprocess.STDOUT,
+        bufsize=1,
+        universal_newlines=True
+    )
+    current_vpn = random_label
+
+    return jsonify({"status": "connected", "vpn": random_label})
 
 # === IP Check Endpoint ===
 @app.route("/get_ip")
