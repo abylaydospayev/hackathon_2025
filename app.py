@@ -46,7 +46,7 @@ def connect():
             vpn_process.terminate()
             vpn_process.wait()
 
-        # ✅ Full path to OpenVPN
+        # Full path to OpenVPN
         openvpn_path = r"C:\Program Files\OpenVPN\bin\openvpn.exe"
         log_file = open("vpn_log.txt", "w")
 
