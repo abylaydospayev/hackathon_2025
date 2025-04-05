@@ -27,26 +27,27 @@
         <div class="col-md-8">
             <div class="card shadow p-4">
                 <h4 class="mb-3">🔎 Your Current IP Info</h4>
-                <ul class="list-group mb-3">
+                <ul class="list-group mb-3" id="ip-info-list">
                     <li class="list-group-item"><strong>IP:</strong> {{ ip_info.ip }}</li>
                     <li class="list-group-item"><strong>City:</strong> {{ ip_info.city }}</li>
                     <li class="list-group-item"><strong>Country:</strong> {{ ip_info.country }}</li>
                 </ul>
 
                 {% if ip_info.error %}
-                    <div class="alert alert-danger">
-                        ⚠️ Error: {{ ip_info.error }}
-                    </div>
+                <div class="alert alert-danger">
+                    ⚠️ Error: {{ ip_info.error }}
+                </div>
                 {% endif %}
 
-                <form method="post" action="/connect" class="mb-3">
+                <form method="post" action="/connect" class="mb-3" id="connect-form">
                     <label class="form-label">🌐 Select VPN Server:</label>
                     <div class="input-group">
                         <select class="form-select" name="vpn_config">
                             {% for name, config in vpn_configs.items() %}
-                                <option value="{{ name }}" data-country-code="{{ config.country_code }}" {% if name == current_vpn %}selected{% endif %}>
-                                    {{ name }}
-                                </option>
+                            <option value="{{ name }}" data-country-code="{{ config.country_code }}"
+                                {% if name == current_vpn %}selected{% endif %}>
+                                {{ name }}
+                            </option>
                             {% endfor %}
                         </select>
                         <button class="btn btn-primary" type="submit">Connect</button>
@@ -67,6 +68,8 @@
 <!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
 <script>
+    let map, marker;
+
     // Map initialization
     document.addEventListener("DOMContentLoaded", function () {
         const loc = "{{ ip_info.loc|default('0,0') }}";
@@ -74,19 +77,19 @@
         const lat = parseFloat(coords[0]);
         const lon = parseFloat(coords[1]);
 
-        const map = L.map('map').setView([lat, lon], 4);
+        map = L.map('map').setView([lat, lon], 4);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
-        L.marker([lat, lon])
+        marker = L.marker([lat, lon])
             .addTo(map)
             .bindPopup(`<b>Current VPN</b><br>{{ ip_info.ip }}<br>{{ ip_info.city }}, {{ ip_info.country }}`)
             .openPopup();
     });
 
     // AJAX Connection Handler
-    document.querySelector('form[action="/connect"]').addEventListener('submit', function(e) {
+    document.getElementById('connect-form').addEventListener('submit', function (e) {
         e.preventDefault();
         const form = e.target;
         const formData = new FormData(form);
@@ -94,7 +97,6 @@
         const expectedCountry = selectedOption.dataset.countryCode;
         const connectButton = form.querySelector('button[type="submit"]');
 
-        // Disable button during connection
         connectButton.disabled = true;
         connectButton.innerHTML = 'Connecting...';
 
@@ -102,28 +104,49 @@
             method: 'POST',
             body: formData
         })
-        .then(response => {
-            if (response.ok) {
-                // Start polling for IP change
-                const pollInterval = setInterval(() => {
-                    fetch('/get_ip')
-                        .then(res => res.json())
-                        .then(ipInfo => {
-                            if (ipInfo.country === expectedCountry) {
-                                clearInterval(pollInterval);
-                                window.location.reload();
-                            }
-                        });
-                }, 3000); // Check every 3 seconds
-            }
-        })
-        .catch(error => {
-            alert('Error: ' + error.message);
-        })
-        .finally(() => {
-            connectButton.disabled = false;
-            connectButton.innerHTML = 'Connect';
-        });
+            .then(response => {
+                if (response.ok) {
+                    const pollInterval = setInterval(() => {
+                        fetch('/get_ip')
+                            .then(res => res.json())
+                            .then(ipInfo => {
+                                if (ipInfo.country === expectedCountry) {
+                                    clearInterval(pollInterval);
+
+                                    // Update info panel
+                                    const infoList = document.getElementById('ip-info-list').children;
+                                    infoList[0].innerHTML = `<strong>IP:</strong> ${ipInfo.ip}`;
+                                    infoList[1].innerHTML = `<strong>City:</strong> ${ipInfo.city}`;
+                                    infoList[2].innerHTML = `<strong>Country:</strong> ${ipInfo.country}`;
+
+                                    // Update map
+                                    const coords = ipInfo.loc.split(",");
+                                    const lat = parseFloat(coords[0]);
+                                    const lon = parseFloat(coords[1]);
+
+                                    map.setView([lat, lon], 4);
+                                    if (marker) {
+                                        marker.setLatLng([lat, lon])
+                                            .setPopupContent(`<b>Current VPN</b><br>${ipInfo.ip}<br>${ipInfo.city}, ${ipInfo.country}`)
+                                            .openPopup();
+                                    } else {
+                                        marker = L.marker([lat, lon])
+                                            .addTo(map)
+                                            .bindPopup(`<b>Current VPN</b><br>${ipInfo.ip}<br>${ipInfo.city}, ${ipInfo.country}`)
+                                            .openPopup();
+                                    }
+                                }
+                            });
+                    }, 3000);
+                }
+            })
+            .catch(error => {
+                alert('Error: ' + error.message);
+            })
+            .finally(() => {
+                connectButton.disabled = false;
+                connectButton.innerHTML = 'Connect';
+            });
     });
 </script>
 </body>
