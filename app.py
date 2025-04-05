@@ -55,7 +55,7 @@ ip_cache = {
 
 # === Get Public IP Info ===
 def get_current_ip():
-    # 🧠 Return cached IP info if still fresh
+    # Return cached IP info if still fresh
     now = time.time()
     if ip_cache["data"] and (now - ip_cache["timestamp"]) < ip_cache["ttl"]:
         return ip_cache["data"]
@@ -93,7 +93,7 @@ def get_current_ip():
                     "loc": loc or "0,0"
                 }
 
-                # 💾 Update cache
+                #  Update cache
                 ip_cache["data"] = result
                 ip_cache["timestamp"] = now
                 return result
@@ -124,7 +124,7 @@ def load_vpn_configs(folder="vpn_configs/connected"):
 
     return configs
 
-# ✅ Load configs before routes
+# Load configs before routes
 vpn_configs = load_vpn_configs()
 
 # === Get AI Recommendations ===
