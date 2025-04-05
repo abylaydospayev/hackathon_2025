@@ -3,18 +3,54 @@ import requests
 import subprocess
 import os
 import glob
-import random
-import time 
+import joblib
+import numpy as np
+import time
 
 app = Flask(__name__)
 
-current_vpn = None              # Label of current VPN
-vpn_process = None              # The subprocess handle for OpenVPN
+current_vpn = None  # Label of current VPN
+vpn_process = None  # The subprocess handle for OpenVPN
+model = joblib.load('vpn_recommendation_model.pkl')  # Load the trained model
 
+# Cache structure to store IP information temporarily
 ip_cache = {
     "data": None,
     "timestamp": 0,
-    "ttl": 60  
+    "ttl": 300  # Cache TTL in seconds (5 minutes)
+}
+
+# === Get Public IP Info ===
+import time
+import requests
+
+# Cache structure to store IP information temporarily
+ip_cache = {
+    "data": None,
+    "timestamp": 0,
+    "ttl": 300  # Cache TTL in seconds (5 minutes)
+}
+
+# === Get Public IP Info ===
+import time
+import requests
+
+# Cache structure to store IP information temporarily
+ip_cache = {
+    "data": None,
+    "timestamp": 0,
+    "ttl": 300  # Cache TTL in seconds (5 minutes)
+}
+
+# === Get Public IP Info ===
+import time
+import requests
+
+# Cache structure to store IP information temporarily
+ip_cache = {
+    "data": None,
+    "timestamp": 0,
+    "ttl": 300  # Cache TTL in seconds (5 minutes)
 }
 
 # === Get Public IP Info ===
@@ -36,17 +72,24 @@ def get_current_ip():
             if res.ok:
                 data = res.json()
 
+                # Logging for debugging the returned data
+                print(f"Data from {url}: {data}")
+
                 ip = data.get("ip") or data.get("address", "")
-                city = data.get("city", "") or data.get("region", "Unknown")
-                country = data.get("country", "") or data.get("country_name", "Unknown")
+                city = data.get("city", "Unknown") or data.get("region", "Unknown")
+                country = data.get("country", "Unknown") or data.get("country_name", "Unknown")
                 loc = data.get("loc", "")
+                
                 if not loc and "latitude" in data and "longitude" in data:
                     loc = f"{data['latitude']},{data['longitude']}"
 
+                # Debugging output for the city and location info
+                print(f"City: {city}, Country: {country}, Location: {loc}")
+
                 result = {
                     "ip": ip,
-                    "city": city or "Unknown",
-                    "country": country or "Unknown",
+                    "city": city,
+                    "country": country,
                     "loc": loc or "0,0"
                 }
 
@@ -54,18 +97,11 @@ def get_current_ip():
                 ip_cache["data"] = result
                 ip_cache["timestamp"] = now
                 return result
-        except:
+        except requests.exceptions.RequestException as e:
+            print(f"Error fetching IP info from {url}: {e}")
             continue
 
-    # 🚫 Fallback if all services fail
-    return {
-        "ip": "",
-        "city": "Unknown",
-        "country": "Unknown",
-        "loc": "0,0",
-        "error": "All IP services failed"
-    }
-
+    return {"ip": "", "city": "Unknown", "country": "Unknown", "loc": "0,0", "error": "All IP services failed"}
 
 
 # === Load VPN Configs from vpn_configs folder ===
@@ -91,11 +127,64 @@ def load_vpn_configs(folder="vpn_configs/connected"):
 # ✅ Load configs before routes
 vpn_configs = load_vpn_configs()
 
+# === Get AI Recommendations ===
+def get_best_vpn():
+    vpn_data = []
+    country_map = {
+        "JP": 0,
+        "KR": 1,
+        "US": 2,
+        "TH": 3,
+        "UN": 4
+    }
+
+    vpn_scores = []  # Store the score and explanation for each VPN
+
+    # Gather past VPN connection data (you might want to replace this with actual data)
+    for name, config in vpn_configs.items():
+        # Features: [success_rate, latency, country_code (encoded)]
+        success_rate = np.random.random()  # Placeholder for success rate
+        latency = np.random.random() * 100  # Placeholder for latency
+        country_code = config["country_code"]  # Feature for the model
+
+        # Convert country_code to numerical value
+        country_numeric = country_map.get(country_code, 4)  # Default to "UN" if country_code not found
+
+        vpn_data.append([success_rate, latency, country_numeric])
+
+        # Get model prediction (VPN score)
+        vpn_score = model.predict([vpn_data[-1]])[0]  # Get the predicted score for the VPN
+
+        # Store VPN score and features for explanation
+        vpn_scores.append({
+            "vpn_name": name,
+            "score": vpn_score,
+            "success_rate": success_rate,
+            "latency": latency,
+            "country_code": country_code,
+            "country_numeric": country_numeric
+        })
+
+    # Sort VPNs by their score in descending order
+    vpn_scores.sort(key=lambda x: x["score"], reverse=True)
+
+    # Get the best VPN (the one with the highest score)
+    best_vpn = vpn_scores[0]
+
+    # Provide an explanation for why the best VPN is recommended
+    explanation = f"The recommended VPN is <strong>{best_vpn['vpn_name']}</strong> with a score of <strong>{best_vpn['score']:.2f}</strong>."
+    explanation += f" It has the best performance with a success rate of <strong>{best_vpn['success_rate']*100:.2f}%</strong> and an average latency of <strong>{best_vpn['latency']:.2f} ms</strong>."
+    explanation += f" The country of the server is <strong>{best_vpn['country_code']}</strong>."
+
+    return best_vpn, explanation, vpn_scores  # Return VPN comparison data as well
+
+
 # === Home Page ===
 @app.route("/")
 def home():
     ip_info = get_current_ip()
-    return render_template("vpn.html", ip_info=ip_info, vpn_configs=vpn_configs, current_vpn=current_vpn)
+    best_vpn, explanation, vpn_comparison = get_best_vpn()
+    return render_template("vpn.html", ip_info=ip_info, vpn_configs=vpn_configs, current_vpn=current_vpn, best_vpn=best_vpn, explanation=explanation, vpn_comparison=vpn_comparison)
 
 # === Connect to VPN ===
 @app.route("/connect", methods=["POST"])
@@ -134,31 +223,6 @@ def disconnect():
         vpn_process = None
     current_vpn = None
     return redirect("/")
-
-# === Ghost Me (Random VPN) ===
-@app.route("/ghost", methods=["POST"])
-def ghost_me():
-    global current_vpn, vpn_process
-    if vpn_process:
-        vpn_process.terminate()
-        vpn_process.wait()
-
-    random_label = random.choice(list(vpn_configs.keys()))
-    config_entry = vpn_configs[random_label]
-
-    openvpn_path = r"C:\\Program Files\\OpenVPN\\bin\\openvpn.exe"
-    log_file = open("vpn_log.txt", "w", buffering=1)
-
-    vpn_process = subprocess.Popen(
-        [openvpn_path, "--config", config_entry["path"]],
-        stdout=log_file,
-        stderr=subprocess.STDOUT,
-        bufsize=1,
-        universal_newlines=True
-    )
-    current_vpn = random_label
-
-    return jsonify({"status": "connected", "vpn": random_label})
 
 # === IP Check Endpoint ===
 @app.route("/get_ip")

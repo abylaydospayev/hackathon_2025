@@ -9,6 +9,7 @@
         body { background-color: #f8f9fa; }
         .container { margin-top: 60px; }
         #map { height: 400px; border-radius: 10px; margin-top: 20px; }
+        .vpn-info { margin-top: 20px; }
     </style>
 </head>
 <body>
@@ -52,9 +53,26 @@
                         🧙‍♂️ Ghost Me & Auto-Rotate: OFF
                     </button>
                 </form>
+
+                <div class="vpn-info">
+                    <h5>Recommended VPN:</h5>
+                    <p><strong>{{ best_vpn['vpn_name'] }}</strong></p>
+                    <p><strong>Explanation:</strong></p>
+                    <p>{{ explanation|safe }}</p>
+                </div>
             </div>
 
             <div id="map"></div>
+
+            <!-- VPN Comparison Table -->
+            <div class="vpn-info mt-4">
+                <h5>VPN Comparison:</h5>
+                <div>
+                    {% for vpn in vpn_comparison %}
+                        <p><strong>{{ vpn['vpn_name'] }}</strong> | Score: {{ vpn['score'] }} | Success Rate: {{ vpn['success_rate'] }}% | Latency: {{ vpn['latency'] }} ms | Country: {{ vpn['country_code'] }}</p>
+                    {% endfor %}
+                </div>
+            </div>
         </div>
     </div>
 </div>
